@@ -29,6 +29,9 @@ preferences {
 	section("Or, turn on when one of these contacts opened"){
 		input "contacts", "capability.contactSensor", multiple: true, title: "Select Contacts", required: false
 	}
+	section("Or, turn on when one of these lock is unlocked"){
+		input "locks", "capability.lock", multiple: true, title: "Select Locks", required: false
+	}
 	section("And off after no more triggers after..."){
 		input "minutes1", "number", title: "Minutes?", defaultValue: "5"
 	}
@@ -43,6 +46,7 @@ def installed()
 	subscribe(switches, "switch", switchChange)
 	subscribe(motions, "motion", motionHandler)
 	subscribe(contacts, "contact", contactHandler)
+	subscribe(locks, "lock", lockHandler)
 	schedule("0 * * * * ?", "scheduleCheck")
     state.myState = "ready"
 }
@@ -54,6 +58,7 @@ def updated()
 	subscribe(motions, "motion", motionHandler)
     subscribe(switches, "switch", switchChange)
 	subscribe(contacts, "contact", contactHandler)
+	subscribe(locks, "lock", lockHandler)
 
     state.myState = "ready"
     log.debug "state: " + state.myState
@@ -93,6 +98,25 @@ def contactHandler(evt) {
             state.myState = "activating"
         }
     } else if (evt.value == "closed") {
+        if (!state.inactiveAt && state.myState == "active" || state.myState == "activating") {
+			// When contact closes, we reset the timer if not already set
+            setActiveAndSchedule()
+        }
+    }
+    log.debug "state: " + state.myState
+}
+
+def lockHandler(evt) {
+	log.debug "lockHandler: $evt.name: $evt.value"
+    
+    if (evt.value == "unlocked") {
+        if(state.myState == "ready") {
+            log.debug "Turning on lights by lock unlocked"
+            switches.on()
+            state.inactiveAt = null
+            state.myState = "activating"
+        }
+    } else if (evt.value == "locked") {
         if (!state.inactiveAt && state.myState == "active" || state.myState == "activating") {
 			// When contact closes, we reset the timer if not already set
             setActiveAndSchedule()
